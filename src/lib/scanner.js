@@ -1,0 +1,65 @@
+import { normalizeContract, bookQuote, rankContracts } from './volume.js';
+
+export class MarketScanner {
+  constructor(getClient) {
+    this.getClient=getClient;this.contracts=[];this.books=new Map();this.history=new Map();
+    this.at=0;this.warning='İlk QFEX taraması bekleniyor.';this.busy=false;this.cursor=0;this.pass=0;this.pinned=[];this.generation=0;
+  }
+  invalidate() { this.generation++; this.at=0; this.contracts=[]; this.warning='Hesap değişti; ücretler yeniden okunuyor.'; }
+  async scan() {
+    if(this.busy) return;
+    this.busy=true;
+    const generation=this.generation,client=this.getClient();
+    try {
+      const results=await Promise.allSettled([client.contracts(),client.reference(),client.publicKey?client.fees():Promise.reject(new Error('Hesap bağlı değil'))]);
+      if(results[0].status==='rejected'||results[1].status==='rejected') throw new Error('QFEX piyasa verisi alınamadı.');
+      const raw=results[0].value.data,refs=results[1].value.data;
+      if(!Array.isArray(raw)||!Array.isArray(refs)) throw new Error('QFEX veri biçimi doğrulanamadı.');
+      const fees=results[2].status==='fulfilled'?results[2].value.fees??{}:{};
+      const bySymbol=new Map(refs.map(r=>[r.symbol,r]));
+      const contracts=raw.map(r=>normalizeContract(r,fees,bySymbol.get(r.ticker_id)));
+      const ordered=[...contracts].sort((a,b)=>(b.volumeUsd??0)-(a.volumeUsd??0));
+      // Refresh liquid/pinned candidates each pass; rotate remaining markets without a request storm.
+      const rotating=Array.from({length:Math.min(12,ordered.length)},(_,i)=>ordered[(this.cursor+i)%ordered.length]?.symbol);
+      // Keep each rotating group for three passes so its movement can actually be measured.
+      if (++this.pass % 3 === 0) this.cursor=(this.cursor+12)%Math.max(1,ordered.length);
+      const symbols=[...new Set([...this.pinned,...ordered.slice(0,12).map(c=>c.symbol),...rotating])].filter(s=>bySymbol.has(s));
+      let cursor=0;
+      await Promise.all(Array.from({length:3},async()=>{
+        while(cursor<symbols.length) {
+          const symbol=symbols[cursor++];
+          try {
+            const book=await client.orderbook(symbol);
+            if(book.ticker_id!==symbol||!Number.isFinite(book.timestamp)) throw new Error('Invalid book');
+            this.books.set(symbol,{book,bookAt:book.timestamp});
+            const q=bookQuote(book,1),now=Date.now();
+            if(q&&now-book.timestamp<=30000&&now-book.timestamp>=-5000) {
+              const points=(this.history.get(symbol)||[]).filter(x=>now-x.at<=60000);
+              if(!points.some(x=>x.at===book.timestamp)) points.push({at:book.timestamp,mid:q.mid});
+              this.history.set(symbol,points);
+            }
+          } catch {this.books.delete(symbol);this.history.delete(symbol);}
+          await new Promise(resolve=>setTimeout(resolve,300));
+        }
+      }));
+      if(generation!==this.generation) return;
+      this.contracts=contracts;this.at=Date.now();
+      this.warning=results[2].status==='rejected'?'Hesap ücretleri doğrulanmadı. Maliyet ve uygun aday seçimi kapalı.':null;
+    } catch(error) {
+      if(generation!==this.generation) return;
+      this.contracts=[];this.at=0;this.warning=error.message;
+    } finally {this.busy=false;}
+  }
+  snapshot(input={}) {
+    const now=Date.now(),stale=!this.at||now-this.at>45000;
+    const rows=stale?[]:this.contracts.map(c=>{
+      const points=(this.history.get(c.symbol)||[]).filter(x=>now-x.at<=60000);
+      const prices=points.map(x=>x.mid),enough=points.length>=2&&Math.max(...points.map(x=>x.at))-Math.min(...points.map(x=>x.at))>=5000;
+      return {...c,...this.books.get(c.symbol),moveBps:enough?(Math.max(...prices)-Math.min(...prices))/Math.min(...prices)*10000:null};
+    });
+    return {at:this.at,source:stale?'unavailable':'qfex-rest',scanIntervalSeconds:15,scanning:this.busy,
+      warning:stale?'Piyasa verisi yok veya güncel değil. İşlem adayı seçilmiyor.':this.warning,
+      coverage:'En likit 12 market ve görev adayı her tur; diğer marketler 3 tur boyunca izlenen 12’li gruplarla taranır. Eski defterler uygun sayılmaz.',
+      contracts:rankContracts(rows,input,now)};
+  }
+}

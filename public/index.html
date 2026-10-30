@@ -1,0 +1,93 @@
+<!doctype html>
+<html lang="tr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>QFEX Volume Desk</title>
+  <link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+  <header class="topbar">
+    <a class="brand" href="#explorer"><span class="mark">Q</span><span>QFEX <b>Volume Desk</b></span></a>
+    <nav>
+      <button data-page="explorer" class="active">Funding Explorer</button>
+      <button data-page="strategy">Volume Stratejisi</button>
+      <button data-page="tasks">Automatic Tasks</button>
+      <button data-page="accounts">Hesap Bağlantısı</button>
+    </nav>
+    <span id="feedBadge" class="badge">Bağlanıyor…</span>
+  </header>
+
+  <main>
+    <section id="accounts" class="page">
+      <div class="section-title"><p class="eyebrow">QFEX ACCOUNT</p><h1>Hesabını bağla</h1><p>Anahtarlarını gir, bağlantıyı doğrula. Bakiye, pozisyon ve komisyonlarını bu ekranda takip et.</p></div>
+      <div class="strategy-grid">
+        <form id="connectionForm" class="card leg" autocomplete="off">
+          <h2>API anahtarları</h2>
+          <label>Public Key<input name="publicKey" type="password" required autocomplete="off" maxlength="2048"></label>
+          <label>Secret Key<input name="secretKey" type="password" required autocomplete="new-password" maxlength="2048"></label>
+          <label>Account ID (isteğe bağlı)<input name="accountId" placeholder="Varsayılan hesap için boş bırak" autocomplete="off"></label>
+          <p class="muted">Account ID cüzdan adresi değildir. Farklı hesap seçmek için QFEX hesap UUID'sini kullanın.</p>
+          <button class="primary">Doğrula ve kaydet</button>
+          <p class="muted">Anahtarlar bu bilgisayarda Windows kullanıcı hesabınıza bağlı şifrelemeyle saklanır. Tarayıcı depolamasına yazılmaz.</p>
+        </form>
+        <div class="card leg">
+          <h2 id="connectionState">Hesap bağlı değil</h2>
+          <p id="connectionInfo" class="muted"></p>
+          <div id="connectionMetrics"></div>
+          <div><button id="retest" class="action">Bağlantıyı yeniden test et</button> <button id="disconnect" class="action">Bağlantıyı kaldır</button></div>
+          <p class="muted">Bu sürüm yalnızca hesap verilerini okur; emir göndermez. Bağlantıyı kaldırmak yerel kaydı siler. Anahtarı iptal etmek için QFEX ayarlarını kullanın.</p>
+        </div>
+      </div>
+      <p id="connectionMessage" role="status" aria-live="polite"></p>
+      <div class="card preview"><h2>QFEX'te anahtar oluşturma</h2><p>Developer → Generate public and secret API keys → isim: Volume Desk → kullanacağınız hesap.</p><p>View balance, View positions ve View orders açık olsun. Şimdilik Execute orders ve Deposit and withdraw kapalı kalsın. Builder code oluşturmanız gerekmiyor.</p></div>
+      <div id="accountDetails" class="card preview hidden"><h2>Pozisyonlar ve komisyonlar</h2><p id="positionSummary"></p><div class="table-wrap"><table><thead><tr><th>Market</th><th>Maker</th><th>Taker</th></tr></thead><tbody id="feeRows"></tbody></table></div></div>
+    </section>
+    <section id="explorer" class="page active">
+      <div class="hero">
+        <div><p class="eyebrow">QFEX VOLUME SCANNER</p><h1>Maliyeti ölç.<br><span>Uygun adayı izle.</span></h1><p>Tek hesapta aç–kapat. Gerçek hesap ücretleri ve emir defteri derinliğiyle maliyet sıralaması. Funding yönü, fiyat tahmini değildir.</p></div>
+        <div class="hero-stat"><small>HAFTALIK HACİM TAHMİNİ</small><strong id="heroVolume">—</strong><span id="heroCost">maliyet hesaplanıyor</span></div>
+      </div>
+      <div id="warning" class="warning hidden"></div>
+      <div class="toolbar card">
+        <label>Pozisyon büyüklüğü ($)<input id="notional" type="number" value="1000" min="1"></label>
+        <label>Maks. giriş maliyeti ($)<input id="maxEntryCost" type="number" value="2.5" min="0.01" step="0.01"></label>
+        <label>Maks. aç–kapat ($)<input id="maxCycleCost" type="number" value="5" min="0.01" step="0.01"></label>
+        <label>Maks. maliyet / $1M<input id="maxCostPerMillion" type="number" value="500" min="1"></label>
+        <label>Filtre<input id="marketSearch" placeholder="Market veya durum ara"></label>
+        <button id="refresh" class="primary">Yenile</button>
+      </div>
+      <div class="card table-card">
+        <div class="card-head"><div><p class="eyebrow">COST &amp; FUNDING</p><h2>Funding Explorer</h2></div><span id="scanStatus">Tarama bekleniyor</span></div>
+        <p class="muted table-note" id="scanCoverage"></p>
+        <div class="table-wrap"><table><thead><tr><th>Market</th><th>Funding yönü</th><th>Funding APR</th><th>Maker / Taker</th><th>Spread</th><th>Giriş / Çıkış</th><th>Aç–kapat</th><th>Maliyet / $1M</th><th>Uygunluk</th></tr></thead><tbody id="marketRows"></tbody></table></div>
+      </div>
+    </section>
+
+    <section id="strategy" class="page">
+      <div class="section-title"><p class="eyebrow">QFEX · SINGLE ACCOUNT</p><h1>Volume stratejisi</h1><p>Uygun adayı seç → aç → gerçekleşmeyi doğrula → kapat → döngü arası bekle. Tek yönlü pozisyon fiyat riski taşır; delta-neutral değildir.</p></div>
+      <form id="strategyForm" class="strategy-grid">
+        <div class="card leg"><p class="eyebrow">POZİSYON</p><h2>Tek hesap, otomatik aday</h2><p id="strategyAccount" class="muted">Hesap Bağlantısı sekmesindeki QFEX hesabı kullanılır.</p>
+          <label>Pozisyon büyüklüğü ($)<input name="notional" type="number" value="1000" min="1" required></label>
+          <label>Kaldıraç hedefi<input name="leverage" type="number" value="2" min="1" max="100" step="1" required></label>
+          <label>Yön<select name="direction"><option value="funding">Funding alan taraf (otomatik)</option><option value="LONG">Long</option><option value="SHORT">Short</option></select></label>
+          <p class="muted">Büyüklük kaldıraç dahil pozisyon tutarıdır. Kaldıraç bu tutarı tekrar çarpmaz. Hesap kaldıraç ayarı henüz değiştirilmez.</p></div>
+        <div class="card leg"><p class="eyebrow">MALİYET &amp; RİSK SINIRLARI</p><h2>Aday eleme</h2>
+          <div class="input-grid"><label>Maks. giriş ($)<input name="maxEntryCost" type="number" value="2.5" min="0.01" step="0.01" required></label><label>Maks. aç–kapat ($)<input name="maxCycleCost" type="number" value="5" min="0.01" step="0.01" required></label><label>Maks. maliyet / $1M<input name="maxCostPerMillion" type="number" value="500" min="1" required></label><label>Maks. spread (bps)<input name="maxSpreadBps" type="number" value="10" min="0.1" step="0.1" required></label><label>Maks. derinlik etkisi (bps)<input name="maxImpactBps" type="number" value="10" min="0.1" step="0.1" required></label><label>Maks. 60 sn fiyat hareketi (bps)<input name="maxMoveBps" type="number" value="25" min="1" required></label><label>Günlük maliyet bütçesi ($)<input name="maxDailyCost" type="number" value="50" min="1" required></label><label>Pozisyon zarar sınırı ($)<input name="maxPositionLoss" type="number" value="10" min="1" required></label></div>
+          <p class="muted">Bütçe ve zarar sınırlarının canlı uygulanması emir yürütücüsüne bağlıdır. Funding geliri maliyetten peşinen düşülmez.</p></div>
+        <div class="card leg"><p class="eyebrow">SET TWAP TIMING</p><h2>Açılış ve kapanış</h2><div class="input-grid"><label>Duration (minutes)<input name="durationMinutes" type="number" value="1" min="0.5" step="0.5" required></label><label>Frequency (seconds)<input name="frequencySeconds" type="number" value="30" min="30" step="1" required></label></div><p class="muted">Süre ilk alt emirden son alt emre kadardır. 1 dk / 30 sn: 0, 30 ve 60. saniyelerde üç alt emir. QFEX TWAP maliyeti taker üzerinden hesaplanır.</p></div>
+        <div class="card leg"><p class="eyebrow">AUTOMATIC TASK</p><h2>Döngü zamanlaması</h2><label class="check"><input name="holdEnabled" type="checkbox"> Açılış sonrası pozisyonu beklet</label><div class="input-grid"><label>Cycle sleep (minutes)<input name="cycleSleepMinutes" type="number" value="1" min="0" step="0.1" required></label><label>Operation sleep (minutes)<input name="operationSleepMinutes" type="number" value="30" min="0" step="0.1" required></label></div><p class="muted">Bekleme kapalıysa operation sleep uygulanmaz. Cycle sleep, kapanış tamamlandıktan sonraki aradır.</p></div>
+        <div class="card preview full"><p id="timingSummary"></p><p class="muted">Hacim tahmini kesintisiz çalışma ve tam gerçekleşme varsayar. Maliyet, mevcut defterden tahmindir; fiyat PnL'si dahil değildir. Risk, bütçe ve işlem saatleri hacmi azaltabilir.</p><button type="button" id="estimate" class="action">Güncel aday ve maliyeti hesapla</button> <button class="primary">Aday takibini başlat</button><p class="warning">Aday taraması ve değişimi çalışır. Gerçek emir yürütücüsü henüz bağlı değildir; bu düğme işlem başlatmaz.</p></div>
+      </form>
+      <div id="estimateResult" class="card preview hidden" aria-live="polite"></div>
+    </section>
+
+    <section id="tasks" class="page">
+      <div class="section-title"><p class="eyebrow">AUTOMATIC TASKS</p><h1>Görev merkezi</h1><p>Takip görevleri gerçek veriyi düzenli tarar. Aday sınır dışına çıktığında seçim kaldırılır ve uygun yeni aday aranır. Emir yürütücüsü henüz bağlı değil; canlı aç–kapat başlamaz.</p></div>
+      <div id="taskList" class="task-list"></div>
+    </section>
+  </main>
+  <script defer src="/app.js"></script>
+  <script defer src="/connection.js"></script>
+</body>
+</html>
