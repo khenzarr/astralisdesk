@@ -1,5 +1,19 @@
 # Passive integrations
 
+## perp-cli evaluation (2026-11-01)
+
+https://github.com/hypurrquant/perp-cli advertises QFEX, Hyperliquid, Pacifica,
+Lighter and other venue adapters under MIT. Useful candidate for reviewing
+QFEX account request construction and future venue adapters. Only the repository
+documentation has been reviewed; implementation/security compatibility is not
+verified. Do not install or route user keys through it until the specific adapter
+is reviewed. No runtime dependency added. Hummingbot remains deferred.
+
+Hyperliquid public crypto funding is now read directly from the official
+metaAndAssetCtxs API by public/crypto.js every 15 seconds. It is display-only;
+account fees, order-book cost evaluation and automatic execution are not yet
+integrated. Failed requests clear rows instead of displaying old prices.
+
 These integrations are disabled and are not imported by `src/server.js`.
 No extra process, dependency, API subscription or order execution is started.
 

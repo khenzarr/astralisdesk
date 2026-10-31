@@ -34,6 +34,10 @@ async function loadMarkets() {
     markets=data.contracts;lastSnapshotAt=data.at;
     $('#feedBadge').textContent=data.source==='qfex-websocket'?'● QFEX · WebSocket':data.source==='qfex-rest'?'● QFEX · REST yedeği / 15 sn':'● VERİ YOK';
     $('#warning').classList.toggle('hidden',!data.warning);$('#warning').textContent=data.warning||'';
+    if(data.at && data.warning?.startsWith('Piyasa verisi alınıyor.')) {
+      $('#warning').textContent='QFEX piyasa verisi güncel. Kişisel işlem maliyetini görmek için bu tarayıcıda hesabını bağla. Yerel uygulamadaki bağlantı web sitesine taşınmaz.';
+      $('#warning').style.background='#14283b';
+    } else { $('#warning').style.background=''; }
     $('#scanCoverage').textContent=data.coverage;
     $('#scanStatus').textContent=`${markets.filter(m=>m.eligible).length} uygun / ${markets.length} market · Son tarama: ${data.at?new Date(data.at).toLocaleTimeString('tr-TR'):'—'}`;
     renderMarkets();
