@@ -27,12 +27,22 @@ export class QfexClient {
     const url = new URL(path, this.baseUrl);
     url.searchParams.set("api_version", this.apiVersion);
     for (const [key, value] of Object.entries(query)) if (value !== undefined && value !== "") url.searchParams.set(key, value);
-    const response = await fetch(url, {
+    let response;
+    for(let attempt=0;attempt<2;attempt++) {
+      response = await fetch(url, {
       redirect: 'error',
       headers: authenticated ? this.authHeaders() : {},
       signal: AbortSignal.timeout(8_000)
-    });
-    if (!response.ok) throw new Error(response.status === 401 ? 'QFEX kimlik doğrulaması başarısız. Anahtarları ve bilgisayar saatini kontrol edin.' : response.status === 403 ? 'QFEX erişimi reddetti. Hesap kapsamını, View balance ve View positions izinlerini kontrol edin.' : `QFEX isteği başarısız (HTTP ${response.status}).`);
+      });
+      if(response.status<500||attempt===1) break;
+      await response.body?.cancel();
+      await new Promise(resolve=>setTimeout(resolve,500));
+    }
+    if (!response.ok) {
+      const reason=response.status === 401 ? 'Kimlik doğrulaması başarısız. Anahtarları ve bilgisayar saatini kontrol edin.' : response.status === 403 ? 'Erişim reddedildi. Hesap kapsamını, View balance ve View positions izinlerini kontrol edin.' : response.status>=500?'QFEX sunucusu isteği işleyemedi; ikinci deneme de başarısız. Bu yanıt anahtarın yanlış olduğunu tek başına göstermez.':'İstek reddedildi.';
+      const error=new Error(`QFEX ${path} · HTTP ${response.status} · ${reason}`);
+      error.endpoint=path;error.status=response.status;throw error;
+    }
     return response.json();
   }
 

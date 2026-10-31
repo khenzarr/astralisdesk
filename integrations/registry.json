@@ -1,0 +1,19 @@
+{
+  "ccxt": {
+    "enabled": false,
+    "role": "Optional public multi-exchange market data",
+    "entrypoint": "./ccxt-public.js",
+    "package": "ccxt",
+    "installed": false,
+    "qfexSupportVerified": false,
+    "source": "https://github.com/ccxt/ccxt"
+  },
+  "hummingbot": {
+    "enabled": false,
+    "role": "Future external strategy/execution service",
+    "status": "reference-only; no runtime bridge implemented",
+    "installed": false,
+    "qfexSupportVerified": false,
+    "source": "https://github.com/hummingbot/hummingbot"
+  }
+}

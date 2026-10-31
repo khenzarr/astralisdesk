@@ -11,7 +11,18 @@ export function validateCredentials(input) {
 }
 
 export async function inspectAccount(client) {
-  const [account, feeData] = await Promise.all([client.positions(), client.fees()]);
+  const results = await Promise.allSettled([client.positions(), client.fees()]);
+  // Fees are user-scoped: they verify the key but do not prove access to the selected account.
+  const partial=results[0].status==='rejected'&&results[0].reason.status>=500&&results[1].status==='fulfilled';
+  if(partial) {
+    const fees=results[1].value?.fees;
+    if(!fees||typeof fees!=='object'||Array.isArray(fees))throw new Error('QFEX komisyon yanıtı doğrulanamadı.');
+    return {checkedAt:new Date().toISOString(),balance:null,positions:null,fees,
+      warning:results[0].reason.message,accountVerified:false};
+  }
+  const failures=results.filter(r=>r.status==='rejected');
+  if(failures.length) throw new Error(failures.map(r=>r.reason.message).join(' | '));
+  const [account, feeData] = results.map(r=>r.value);
   if (!account?.balance || !(account.positions === null || Array.isArray(account.positions)) || !feeData?.fees || typeof feeData.fees !== 'object' || Array.isArray(feeData.fees)) throw new Error('QFEX yanıt biçimi beklenenden farklı.');
-  return { checkedAt: new Date().toISOString(), balance: account.balance, positions: account.positions ?? [], fees: feeData.fees };
+  return { checkedAt: new Date().toISOString(), balance: account.balance, positions: account.positions ?? [], fees: feeData.fees,accountVerified:true };
 }

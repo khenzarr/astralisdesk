@@ -34,10 +34,11 @@ test('round-trip includes both fees and spread once; funding credit not prepaid'
   const c=candidate();c.nextFundingAt=now/1000+60;
   assert.equal(evaluateCandidate(c,{direction:'LONG'},now).cycle.fundingCost,0.1);
 });
-test('stale book, rapid move, unknown hours and strict entry ceiling block candidates',()=>{
+test('stale book, rapid move, inactive product and strict entry ceiling block candidates',()=>{
   const c=candidate();c.bookAt=now-31000;assert.equal(evaluateCandidate(c,{},now).eligible,false);
   c.bookAt=now;c.moveBps=50;assert.equal(evaluateCandidate(c,{},now).eligible,false);
-  c.moveBps=2;c.ref={...ref,market_hours:{}};assert.equal(evaluateCandidate(c,{},now).eligible,false);
+  c.moveBps=2;c.ref={...ref,market_hours:{}};assert.equal(evaluateCandidate(c,{},now).eligible,true);
+  c.ref={...ref,status:'INACTIVE'};assert.equal(evaluateCandidate(c,{},now).eligible,false);
   assert.equal(evaluateCandidate(candidate(),{maxEntryCost:0.1},now).eligible,false);
   assert.equal(marketOpen(ref,now),true);assert.equal(marketOpen(ref,now+86400000),null);
 });

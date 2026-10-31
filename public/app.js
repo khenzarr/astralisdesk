@@ -32,7 +32,7 @@ async function loadMarkets() {
   try {
     const data=await api(`/api/explorer?${query()}`);
     markets=data.contracts;lastSnapshotAt=data.at;
-    $('#feedBadge').textContent=data.source==='qfex-rest'?'● QFEX · REST / 15 sn':'● VERİ YOK';
+    $('#feedBadge').textContent=data.source==='qfex-websocket'?'● QFEX · WebSocket':data.source==='qfex-rest'?'● QFEX · REST yedeği / 15 sn':'● VERİ YOK';
     $('#warning').classList.toggle('hidden',!data.warning);$('#warning').textContent=data.warning||'';
     $('#scanCoverage').textContent=data.coverage;
     $('#scanStatus').textContent=`${markets.filter(m=>m.eligible).length} uygun / ${markets.length} market · Son tarama: ${data.at?new Date(data.at).toLocaleTimeString('tr-TR'):'—'}`;
@@ -46,8 +46,8 @@ function renderMarkets() {
   const filter=$('#marketSearch').value.toLowerCase();
   const visible=markets.filter(m=>`${m.symbol} ${m.category} ${m.reasons.join(' ')} ${m.eligible?'uygun':''}`.toLowerCase().includes(filter));
   $('#marketRows').innerHTML=visible.length?visible.map(m=>`<tr>
-    <td><strong>${safeText(m.symbol)}</strong><br><small class="muted">${safeText(m.category)} · ${m.hasContract?'Fiyat akışı mevcut':'Yalnızca katalog · fiyat akışı yok'}<br>${money(m.price)} · ${money(m.volumeUsd,true)} hacim</small></td>
-    <td>${safeText(m.signal)}</td><td>${percent(m.fundingApr)}</td>
+    <td><strong>${safeText(m.symbol)}</strong><br><small class="muted">${safeText(m.category)} · ${m.hasContract?'REST sözleşme verisi mevcut':'REST sözleşme verisi yok'}<br>${money(m.price)} · ${money(m.volumeUsd,true)} hacim</small></td>
+    <td>${safeText(m.signal)}<br><small class="muted">${m.fundingHoursActive===false?'Funding saati dışında':''}</small></td><td>${percent(m.fundingApr)}<br><small class="muted">${percent(m.fundingRate===null?null:m.fundingRate*100)} / ${m.intervalMinutes??'—'} dk<br>${m.liveFundingAt?'WebSocket':'REST'}</small></td>
     <td>${percent(m.makerFee===null?null:m.makerFee*100)} / ${percent(m.takerFee===null?null:m.takerFee*100)}</td>
     <td>${m.quote?m.quote.spreadBps.toFixed(2)+' bps':'—'}</td>
     <td>${money(m.cycle?.entryCost)} / ${money(m.cycle?.exitCost)}</td>
@@ -96,6 +96,7 @@ async function loadTasks() {
     document.querySelectorAll('[data-task]').forEach(b=>b.onclick=async()=>{b.disabled=true;try{await api('/api/tasks/'+b.dataset.task,'POST',{action:b.dataset.action});await loadTasks();}catch(e){$('#taskList').textContent=e.message;}});
   }catch(e){$('#taskList').textContent=e.message;}
 }
-setInterval(()=>{loadMarkets();if($('#tasks').classList.contains('active')) loadTasks();},15000);
+setInterval(loadMarkets,2000);
+setInterval(()=>{if($('#tasks').classList.contains('active')) loadTasks();},5000);
 setInterval(()=>{if(lastSnapshotAt&&Date.now()-lastSnapshotAt>45000){markets=[];renderMarkets();$('#feedBadge').textContent='● VERİ ESKİ';}},1000);
 updateTiming();loadMarkets();

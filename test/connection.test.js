@@ -33,6 +33,25 @@ test('upstream errors do not echo credentials or raw response bodies', async () 
   try { await assert.rejects(new QfexClient({publicKey:'key',secretKey:'secret'}).positions(), error => !error.message.includes('secret') && error.message.includes('doğrulaması')); }
   finally { globalThis.fetch = original; }
 });
+
+test('server failures retry once with fresh auth and identify failed endpoints without response bodies',async()=>{
+  const original=globalThis.fetch,nonces=[];
+  globalThis.fetch=async(url,options)=>{nonces.push(options.headers['x-qfex-nonce']);return new Response('sensitive upstream body',{status:500});};
+  try {
+    await assert.rejects(new QfexClient({publicKey:'test',secretKey:'test'}).fees(),e=>e.status===500&&e.endpoint==='/user/fees'&&!e.message.includes('sensitive'));
+    assert.equal(nonces.length,2);assert.notEqual(nonces[0],nonces[1]);
+  } finally {globalThis.fetch=original;}
+  await assert.rejects(inspectAccount({positions:async()=>{throw Error('positions 500');},fees:async()=>{throw Error('fees 403');}}),/positions 500.*fees 403/);
+});
+
+test('verified fees can be saved during positions 500 without inventing an empty account',async()=>{
+  const error=new Error('QFEX /user/positions HTTP 500');error.status=500;
+  const client={positions:async()=>{throw error;},fees:async()=>({fees:{TEST:{maker_fee:0,taker_fee:0.001}}})};
+  const snapshot=await inspectAccount(client);
+  assert.equal(snapshot.accountVerified,false);assert.equal(snapshot.balance,null);assert.equal(snapshot.positions,null);
+  assert.equal(snapshot.fees.TEST.taker_fee,0.001);
+  error.status=401;await assert.rejects(inspectAccount(client));
+});
 test('Windows encrypted storage survives reload, replacement and deletion', {skip: process.platform !== 'win32'}, async () => {
   const dir = await mkdtemp(join(tmpdir(), 'qfex-store-test-'));
   const file = join(dir,'test.dpapi');

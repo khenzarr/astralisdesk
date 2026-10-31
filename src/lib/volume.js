@@ -61,9 +61,9 @@ export function marketOpen(ref,now=Date.now()) {
 }
 export function evaluateCandidate(c,input={},now=Date.now()) {
   const p=settings(input),reasons=[],schedule=timing(p),quote=bookQuote(c.book,p.notional);
-  const age=c.bookAt?(now-c.bookAt)/1000:Infinity,open=marketOpen(c.ref,now);
-  if(open!==true) reasons.push(open===false?'Market kapalı / aktif değil':'İşlem saatleri doğrulanamadı');
-  if(open===true&&marketOpen(c.ref,now+(2*p.durationMinutes+schedule.holdingMinutes)*60000)!==true) reasons.push('Planlanan kapanışta market açık değil / doğrulanamadı');
+  const age=c.bookAt?(now-c.bookAt)/1000:Infinity;
+  // QFEX market_hours describes funding activity, not a ban on 24/7 trading.
+  if(c.ref.status!=='ACTIVE') reasons.push('Ürün aktif değil / durumu doğrulanamadı');
   if(c.takerFee===null) reasons.push('Hesap komisyonu bilinmiyor');
   if(!quote) reasons.push('Emir defteri / çift taraflı derinlik yetersiz');
   if(age< -5||age>p.maxBookAgeSeconds) reasons.push('Emir defteri eski veya alınamadı');
@@ -96,7 +96,7 @@ export function evaluateCandidate(c,input={},now=Date.now()) {
     if(costPerMillion>p.maxCostPerMillion) reasons.push('$1M hacim maliyeti sınırı aşıldı');
     if(costPerCycle>p.maxDailyCost) reasons.push('Tek döngü günlük bütçeyi aşıyor');
   }
-  return {...c,book:undefined,ref:undefined,side,quote,cycle,reasons,eligible:reasons.length===0,bookAgeSeconds:Number.isFinite(age)?age:null};
+  return {...c,book:undefined,ref:undefined,fundingHoursActive:marketOpen(c.ref,now),side,quote,cycle,reasons,eligible:reasons.length===0,bookAgeSeconds:Number.isFinite(age)?age:null};
 }
 export function rankContracts(contracts,input={},now=Date.now()) {
   return contracts.map(c=>evaluateCandidate(c,input,now)).sort((a,b)=>Number(b.eligible)-Number(a.eligible)

@@ -7,6 +7,7 @@ import { CredentialStore } from './lib/credentials.js';
 import { validateCredentials, inspectAccount } from './lib/connection.js';
 import { timing, settings, validateTask } from './lib/volume.js';
 import { MarketScanner } from './lib/scanner.js';
+import { MarketStream } from './lib/market-stream.js';
 import { TaskManager } from './lib/tasks.js';
 
 const root = fileURLToPath(new URL("../public/", import.meta.url));
@@ -22,8 +23,10 @@ let client = new QfexClient({
 });
 let accountSnapshot = null;
 let connectionBusy = false;
-const connectionStatus = () => ({ configured: Boolean(client.publicKey && client.secretKey), connected: Boolean(accountSnapshot), accountId: client.accountId || '', storageError, snapshot: accountSnapshot, executionMode: 'unavailable' });
+const connectionStatus = () => ({ configured: Boolean(client.publicKey && client.secretKey), connected: accountSnapshot?.accountVerified===true, feesVerified:Boolean(accountSnapshot), accountId: client.accountId || '', storageError, snapshot: accountSnapshot, executionMode: 'unavailable' });
 const scanner = new MarketScanner(() => client);
+scanner.stream=new MarketStream((symbol,book)=>scanner.recordBook(symbol,book));
+scanner.stream.start();
 const taskManager = new TaskManager(fileURLToPath(new URL('../data/tasks.json', import.meta.url)), scanner);
 await taskManager.load();
 let scanBusy = false;
@@ -70,7 +73,7 @@ const server = http.createServer(async (req, res) => {
         }
         if (url.pathname === '/api/connection' && req.method === 'POST') {
           const credentials = validateCredentials(await body(req));
-          const candidate = new QfexClient(credentials);
+          const candidate = new QfexClient({baseUrl:client.baseUrl,apiVersion:client.apiVersion,...credentials});
           const snapshot = await inspectAccount(candidate);
           await store.save(credentials);
           client = candidate; accountSnapshot = snapshot; storageError = null; scanner.invalidate(); void scanAndEvaluate();

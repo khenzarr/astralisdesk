@@ -15,6 +15,17 @@ export class MarketScanner {
     this.at=0;this.warning='İlk QFEX taraması bekleniyor.';this.busy=false;this.cursor=0;this.pass=0;this.pinned=[];this.generation=0;
   }
   invalidate() { this.generation++; this.at=0; this.contracts=[]; this.warning='Hesap değişti; ücretler yeniden okunuyor.'; }
+  recordBook(symbol,book) {
+    const now=Date.now();
+    if(book.ticker_id!==symbol||!Number.isFinite(book.timestamp)||book.timestamp<(this.books.get(symbol)?.bookAt??0))return;
+    this.books.set(symbol,{book,bookAt:book.timestamp});
+    const q=bookQuote(book,1);
+    if(q&&now-book.timestamp<=30000&&now-book.timestamp>=-5000) {
+      const points=(this.history.get(symbol)||[]).filter(x=>now-x.at<=60000);
+      if(!points.some(x=>x.at===book.timestamp))points.push({at:book.timestamp,mid:q.mid});
+      this.history.set(symbol,points);
+    }
+  }
   async scan() {
     if(this.busy) return;
     this.busy=true;
@@ -32,7 +43,7 @@ export class MarketScanner {
       const rotating=Array.from({length:Math.min(12,ordered.length)},(_,i)=>ordered[(this.cursor+i)%ordered.length]?.symbol);
       // Keep each rotating group for three passes so its movement can actually be measured.
       if (++this.pass % 3 === 0) this.cursor=(this.cursor+12)%Math.max(1,ordered.length);
-      const symbols=[...new Set([...this.pinned,...ordered.slice(0,12).map(c=>c.symbol),...rotating])].filter(s=>bySymbol.has(s));
+      const symbols=this.stream?.status().connected?[]:[...new Set([...this.pinned,...ordered.slice(0,12).map(c=>c.symbol),...rotating])].filter(s=>bySymbol.has(s));
       let cursor=0;
       await Promise.all(Array.from({length:3},async()=>{
         while(cursor<symbols.length) {
@@ -40,13 +51,7 @@ export class MarketScanner {
           try {
             const book=await client.orderbook(symbol);
             if(book.ticker_id!==symbol||!Number.isFinite(book.timestamp)) throw new Error('Invalid book');
-            this.books.set(symbol,{book,bookAt:book.timestamp});
-            const q=bookQuote(book,1),now=Date.now();
-            if(q&&now-book.timestamp<=30000&&now-book.timestamp>=-5000) {
-              const points=(this.history.get(symbol)||[]).filter(x=>now-x.at<=60000);
-              if(!points.some(x=>x.at===book.timestamp)) points.push({at:book.timestamp,mid:q.mid});
-              this.history.set(symbol,points);
-            }
+            this.recordBook(symbol,book);
           } catch {this.books.delete(symbol);this.history.delete(symbol);}
           await new Promise(resolve=>setTimeout(resolve,300));
         }
@@ -64,11 +69,12 @@ export class MarketScanner {
     const rows=stale?[]:this.contracts.map(c=>{
       const points=(this.history.get(c.symbol)||[]).filter(x=>now-x.at<=60000);
       const prices=points.map(x=>x.mid),enough=points.length>=2&&Math.max(...points.map(x=>x.at))-Math.min(...points.map(x=>x.at))>=5000;
-      return {...c,...this.books.get(c.symbol),moveBps:enough?(Math.max(...prices)-Math.min(...prices))/Math.min(...prices)*10000:null};
+      return {...(this.stream?.overlay(c,now)??c),...this.books.get(c.symbol),moveBps:enough?(Math.max(...prices)-Math.min(...prices))/Math.min(...prices)*10000:null};
     });
-    return {at:this.at,source:stale?'unavailable':'qfex-rest',scanIntervalSeconds:15,scanning:this.busy,
+    const stream=this.stream?.status(now);
+    return {at:this.at,source:stale?'unavailable':stream?.connected?'qfex-websocket':'qfex-rest',stream,scanIntervalSeconds:15,scanning:this.busy,
       warning:stale?'Piyasa verisi yok veya güncel değil. İşlem adayı seçilmiyor.':this.warning,
-      coverage:`QFEX kataloğu: ${rows.length} market; fiyat/funding akışı: ${rows.filter(c=>c.hasContract).length}. Kategoriler: ${[...new Set(rows.map(c=>c.category))].join(', ')}. Katalogda olup akışta olmayan ürünler işlem adayı seçilmez. En likit 12 market ve görev adayı her tur; diğerleri 3 tur izlenen 12’li gruplarla taranır. Eski defterler uygun sayılmaz.`,
+      coverage:`QFEX kataloğu: ${rows.length} market; REST fiyat/funding: ${rows.filter(c=>c.hasContract).length}. ${stream?.connected?`WebSocket açık: ${stream.symbols} ürünün istatistikleri; tüm ürünlerde 500 ms derinlik yayınına abonelik, toplu istatistikler 10 sn. Ekran 2 sn aralıkla yenilenir.`:'WebSocket bekleniyor / bağlantı yok. REST yedeği: en likit 12 market ve görev adayı her tur; diğerleri 12’li gruplarla taranır.'} Kategoriler: ${[...new Set(rows.map(c=>c.category))].join(', ')}. Eski veya eksik veri uygun sayılmaz.`,
       contracts:rankContracts(rows,input,now)};
   }
 }
