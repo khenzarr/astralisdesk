@@ -1,0 +1,9 @@
+.git
+.vercel
+data
+artifacts
+logs
+.env*
+test
+integrations
+README.md

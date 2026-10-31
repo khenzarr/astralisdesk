@@ -11,18 +11,32 @@ export function validateCredentials(input) {
 }
 
 export async function inspectAccount(client) {
-  const results = await Promise.allSettled([client.positions(), client.fees()]);
-  // Fees are user-scoped: they verify the key but do not prove access to the selected account.
-  const partial=results[0].status==='rejected'&&results[0].reason.status>=500&&results[1].status==='fulfilled';
-  if(partial) {
-    const fees=results[1].value?.fees;
-    if(!fees||typeof fees!=='object'||Array.isArray(fees))throw new Error('QFEX komisyon yanıtı doğrulanamadı.');
-    return {checkedAt:new Date().toISOString(),balance:null,positions:null,fees,
-      warning:results[0].reason.message,accountVerified:false};
+  const [positionsResult, feesResult, balancesResult] = await Promise.allSettled([
+    client.positions(), client.fees(), client.balances()
+  ]);
+  if (feesResult.status === 'rejected') throw feesResult.reason;
+  const fees=feesResult.value?.fees;
+  if(!fees||typeof fees!=='object'||Array.isArray(fees)) throw new Error('QFEX komisyon yanıtı doğrulanamadı.');
+
+  let balance=null,positions=null,positionsVerified=false,balanceVerified=false;
+  if(positionsResult.status==='fulfilled') {
+    const account=positionsResult.value;
+    if(!account?.balance||!(account.positions===null||Array.isArray(account.positions))) throw new Error('QFEX pozisyon yanıtı beklenenden farklı.');
+    balance=account.balance;positions=account.positions??[];positionsVerified=true;balanceVerified=true;
+  } else {
+    if(!(positionsResult.reason?.status>=500)) throw positionsResult.reason;
+    if(balancesResult.status==='rejected') throw new Error(`${positionsResult.reason.message} | ${balancesResult.reason.message}`);
+    const accounts=balancesResult.value?.accounts;
+    if(!(accounts===null||Array.isArray(accounts))) throw new Error('QFEX bakiye yanıtı beklenenden farklı.');
+    const selected=(accounts??[]).find(a=>client.accountId?a.account_id===client.accountId:a.is_master)??null;
+    if(!selected&&client.accountId) throw new Error('Seçilen QFEX Account ID bakiye listesinde bulunamadı.');
+    balance=selected?{available_balance:selected.available_balance,equity:selected.equity}:null;
+    balanceVerified=Boolean(selected);
   }
-  const failures=results.filter(r=>r.status==='rejected');
-  if(failures.length) throw new Error(failures.map(r=>r.reason.message).join(' | '));
-  const [account, feeData] = results.map(r=>r.value);
-  if (!account?.balance || !(account.positions === null || Array.isArray(account.positions)) || !feeData?.fees || typeof feeData.fees !== 'object' || Array.isArray(feeData.fees)) throw new Error('QFEX yanıt biçimi beklenenden farklı.');
-  return { checkedAt: new Date().toISOString(), balance: account.balance, positions: account.positions ?? [], fees: feeData.fees,accountVerified:true };
+  return {
+    checkedAt:new Date().toISOString(),balance,positions,fees,
+    credentialsVerified:true,balanceVerified,positionsVerified,
+    accountVerified:balanceVerified&&positionsVerified,
+    warning:positionsVerified?null:`${positionsResult.reason.message} Bakiye erişimi doğrulandı; açık pozisyon listesi QFEX tarafından doğrulanamadı.`
+  };
 }

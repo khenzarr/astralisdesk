@@ -64,16 +64,17 @@ export class MarketScanner {
       this.contracts=[];this.at=0;this.warning=error.message;
     } finally {this.busy=false;}
   }
-  snapshot(input={}) {
+  snapshot(input={},feeOverride=null) {
     const now=Date.now(),stale=!this.at||now-this.at>45000;
     const rows=stale?[]:this.contracts.map(c=>{
       const points=(this.history.get(c.symbol)||[]).filter(x=>now-x.at<=60000);
       const prices=points.map(x=>x.mid),enough=points.length>=2&&Math.max(...points.map(x=>x.at))-Math.min(...points.map(x=>x.at))>=5000;
-      return {...(this.stream?.overlay(c,now)??c),...this.books.get(c.symbol),moveBps:enough?(Math.max(...prices)-Math.min(...prices))/Math.min(...prices)*10000:null};
+      const live=this.stream?.overlay(c,now)??c,fee=feeOverride?.[c.symbol];
+      return {...live,...(fee?{makerFee:Number(fee.maker_fee),takerFee:Number(fee.taker_fee)}:{}),...this.books.get(c.symbol),moveBps:enough?(Math.max(...prices)-Math.min(...prices))/Math.min(...prices)*10000:null};
     });
     const stream=this.stream?.status(now);
     return {at:this.at,source:stale?'unavailable':stream?.connected?'qfex-websocket':'qfex-rest',stream,scanIntervalSeconds:15,scanning:this.busy,
-      warning:stale?'Piyasa verisi yok veya güncel değil. İşlem adayı seçilmiyor.':this.warning,
+      warning:stale?'Piyasa verisi yok veya güncel değil. İşlem adayı seçilmiyor.':feeOverride?null:this.warning,
       coverage:`QFEX kataloğu: ${rows.length} market; REST fiyat/funding: ${rows.filter(c=>c.hasContract).length}. ${stream?.connected?`WebSocket açık: ${stream.symbols} ürünün istatistikleri; tüm ürünlerde 500 ms derinlik yayınına abonelik, toplu istatistikler 10 sn. Ekran 2 sn aralıkla yenilenir.`:'WebSocket bekleniyor / bağlantı yok. REST yedeği: en likit 12 market ve görev adayı her tur; diğerleri 12’li gruplarla taranır.'} Kategoriler: ${[...new Set(rows.map(c=>c.category))].join(', ')}. Eski veya eksik veri uygun sayılmaz.`,
       contracts:rankContracts(rows,input,now)};
   }

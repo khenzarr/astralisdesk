@@ -1,0 +1,8 @@
+.git
+data
+artifacts
+logs
+.env*
+test
+integrations
+Dockerfile

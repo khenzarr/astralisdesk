@@ -51,5 +51,6 @@ export class QfexClient {
   orderbook(symbol) { return this.get(`/md/orderbook/${encodeURIComponent(symbol)}`); }
   fees() { return this.get("/user/fees", { authenticated: true }); }
   positions() { return this.get("/user/positions", { authenticated: true }); }
+  balances() { return this.get("/user/subaccounts/balance", { authenticated: true }); }
   volume(duration = "1w") { return this.get("/user/volume", { authenticated: true, query: { duration } }); }
 }
