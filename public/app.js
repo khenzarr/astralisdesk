@@ -44,9 +44,9 @@ async function loadMarkets() {
 }
 function renderMarkets() {
   const filter=$('#marketSearch').value.toLowerCase();
-  const visible=markets.filter(m=>`${m.symbol} ${m.reasons.join(' ')} ${m.eligible?'uygun':''}`.toLowerCase().includes(filter));
+  const visible=markets.filter(m=>`${m.symbol} ${m.category} ${m.reasons.join(' ')} ${m.eligible?'uygun':''}`.toLowerCase().includes(filter));
   $('#marketRows').innerHTML=visible.length?visible.map(m=>`<tr>
-    <td><strong>${safeText(m.symbol)}</strong><br><small class="muted">${money(m.price)} · ${money(m.volumeUsd,true)} hacim</small></td>
+    <td><strong>${safeText(m.symbol)}</strong><br><small class="muted">${safeText(m.category)} · ${m.hasContract?'Fiyat akışı mevcut':'Yalnızca katalog · fiyat akışı yok'}<br>${money(m.price)} · ${money(m.volumeUsd,true)} hacim</small></td>
     <td>${safeText(m.signal)}</td><td>${percent(m.fundingApr)}</td>
     <td>${percent(m.makerFee===null?null:m.makerFee*100)} / ${percent(m.takerFee===null?null:m.takerFee*100)}</td>
     <td>${m.quote?m.quote.spreadBps.toFixed(2)+' bps':'—'}</td>

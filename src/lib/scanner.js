@@ -1,5 +1,14 @@
 import { normalizeContract, bookQuote, rankContracts } from './volume.js';
 
+export function mergeMarkets(raw, refs, fees={}) {
+  const reference=new Map(refs.map(r=>[r.symbol,r]));
+  const live=new Map(raw.map(r=>[r.ticker_id,r]));
+  return [...new Set([...reference.keys(),...live.keys()])].map(symbol=>({
+    ...normalizeContract(live.get(symbol)??{ticker_id:symbol},fees,reference.get(symbol)),
+    hasContract:live.has(symbol),category:reference.get(symbol)?.product_category??'UNKNOWN'
+  }));
+}
+
 export class MarketScanner {
   constructor(getClient) {
     this.getClient=getClient;this.contracts=[];this.books=new Map();this.history=new Map();
@@ -17,8 +26,8 @@ export class MarketScanner {
       if(!Array.isArray(raw)||!Array.isArray(refs)) throw new Error('QFEX veri biçimi doğrulanamadı.');
       const fees=results[2].status==='fulfilled'?results[2].value.fees??{}:{};
       const bySymbol=new Map(refs.map(r=>[r.symbol,r]));
-      const contracts=raw.map(r=>normalizeContract(r,fees,bySymbol.get(r.ticker_id)));
-      const ordered=[...contracts].sort((a,b)=>(b.volumeUsd??0)-(a.volumeUsd??0));
+      const contracts=mergeMarkets(raw,refs,fees);
+      const ordered=contracts.filter(c=>c.hasContract).sort((a,b)=>(b.volumeUsd??0)-(a.volumeUsd??0));
       // Refresh liquid/pinned candidates each pass; rotate remaining markets without a request storm.
       const rotating=Array.from({length:Math.min(12,ordered.length)},(_,i)=>ordered[(this.cursor+i)%ordered.length]?.symbol);
       // Keep each rotating group for three passes so its movement can actually be measured.
@@ -44,7 +53,7 @@ export class MarketScanner {
       }));
       if(generation!==this.generation) return;
       this.contracts=contracts;this.at=Date.now();
-      this.warning=results[2].status==='rejected'?'Hesap ücretleri doğrulanmadı. Maliyet ve uygun aday seçimi kapalı.':null;
+      this.warning=results[2].status==='rejected'?'Piyasa verisi alınıyor. Hesap komisyonları için Hesap Bağlantısı sekmesinden bağlantıyı doğrulayın; o zamana kadar maliyet ve aday seçimi hesaplanamaz.':null;
     } catch(error) {
       if(generation!==this.generation) return;
       this.contracts=[];this.at=0;this.warning=error.message;
@@ -59,7 +68,7 @@ export class MarketScanner {
     });
     return {at:this.at,source:stale?'unavailable':'qfex-rest',scanIntervalSeconds:15,scanning:this.busy,
       warning:stale?'Piyasa verisi yok veya güncel değil. İşlem adayı seçilmiyor.':this.warning,
-      coverage:'En likit 12 market ve görev adayı her tur; diğer marketler 3 tur boyunca izlenen 12’li gruplarla taranır. Eski defterler uygun sayılmaz.',
+      coverage:`QFEX kataloğu: ${rows.length} market; fiyat/funding akışı: ${rows.filter(c=>c.hasContract).length}. Kategoriler: ${[...new Set(rows.map(c=>c.category))].join(', ')}. Katalogda olup akışta olmayan ürünler işlem adayı seçilmez. En likit 12 market ve görev adayı her tur; diğerleri 3 tur izlenen 12’li gruplarla taranır. Eski defterler uygun sayılmaz.`,
       contracts:rankContracts(rows,input,now)};
   }
 }

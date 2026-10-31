@@ -8,6 +8,8 @@ Node 22+ on Windows: `npm start`, then open http://localhost:4173. `npm test` ru
 
 ## Real data only
 
+Explorer includes the union of QFEX reference catalog and contract feed, with category and quote availability shown per row. Catalog-only products retain unknown prices/funding and are not eligible. The current upstream categories determine available instruments; no synthetic crypto pairs are added. Account connection accepts QFEX's documented null positions list for an empty account. Failed validation preserves form fields and shows an inline error; successful encrypted saving clears the keys.
+
 There is no demo/fallback dataset. The server polls QFEX contracts, reference data and account fees every 15 seconds (non-overlapping scans). It refreshes order books for the 12 highest-volume markets plus monitored candidates, and watches another 12-market group for three consecutive scans before rotating, with 3 workers and request spacing. This coverage is shown in Explorer; it is **not a complete, simultaneous cross-market snapshot**. Candidate books older than 30 seconds, invalid/missing depth, unknown fees/hours, closed markets and missing funding data fail closed. Contract snapshots expire after 45 seconds; tasks re-evaluate every 5 seconds even during a slow upstream scan. WebSocket market streaming is not implemented.
 
 The short-term movement filter uses the range of sampled book midpoints over the last 60 seconds, requiring at least two points separated by 5 seconds. It is a sampled risk filter, not a volatility forecast or loss guarantee. Account fee failures do not turn public market data into invented data. Costs remain unknown until authenticated fees arrive.

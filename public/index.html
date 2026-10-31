@@ -29,6 +29,7 @@
           <label>Account ID (isteğe bağlı)<input name="accountId" placeholder="Varsayılan hesap için boş bırak" autocomplete="off"></label>
           <p class="muted">Account ID cüzdan adresi değildir. Farklı hesap seçmek için QFEX hesap UUID'sini kullanın.</p>
           <button class="primary">Doğrula ve kaydet</button>
+          <p id="connectionMessage" role="status" aria-live="polite"></p>
           <p class="muted">Anahtarlar bu bilgisayarda Windows kullanıcı hesabınıza bağlı şifrelemeyle saklanır. Tarayıcı depolamasına yazılmaz.</p>
         </form>
         <div class="card leg">
@@ -39,7 +40,6 @@
           <p class="muted">Bu sürüm yalnızca hesap verilerini okur; emir göndermez. Bağlantıyı kaldırmak yerel kaydı siler. Anahtarı iptal etmek için QFEX ayarlarını kullanın.</p>
         </div>
       </div>
-      <p id="connectionMessage" role="status" aria-live="polite"></p>
       <div class="card preview"><h2>QFEX'te anahtar oluşturma</h2><p>Developer → Generate public and secret API keys → isim: Volume Desk → kullanacağınız hesap.</p><p>View balance, View positions ve View orders açık olsun. Şimdilik Execute orders ve Deposit and withdraw kapalı kalsın. Builder code oluşturmanız gerekmiyor.</p></div>
       <div id="accountDetails" class="card preview hidden"><h2>Pozisyonlar ve komisyonlar</h2><p id="positionSummary"></p><div class="table-wrap"><table><thead><tr><th>Market</th><th>Maker</th><th>Taker</th></tr></thead><tbody id="feeRows"></tbody></table></div></div>
     </section>

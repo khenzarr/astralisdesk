@@ -124,7 +124,7 @@ const server = http.createServer(async (req, res) => {
     if (!file.startsWith(root)) return json(res, 403, { error: "Forbidden" });
     const content = await readFile(file);
     const types = { ".html": "text/html; charset=utf-8", ".css": "text/css; charset=utf-8", ".js": "text/javascript; charset=utf-8", ".svg": "image/svg+xml" };
-    res.writeHead(200, { "content-type": types[extname(file)] ?? "application/octet-stream" });
+    res.writeHead(200, { "content-type": types[extname(file)] ?? "application/octet-stream", "cache-control": "no-store" });
     res.end(content);
   } catch (error) {
     if (error.code === "ENOENT") return json(res, 404, { error: "Not found" });

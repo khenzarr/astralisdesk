@@ -13,17 +13,18 @@ async function loadConnection() {
 }
 async function connectionAction(path,method,payload) {
   const buttons=[...document.querySelectorAll('#accounts button')];buttons.forEach(b=>b.disabled=true);
-  $('#connectionMessage').textContent='İşlem sürüyor…';
+  const message=$('#connectionMessage');
+  message.dataset.state='busy';message.textContent='QFEX bağlantısı doğrulanıyor, ardından şifreli kaydedilecek…';
+  $('#connectionForm').setAttribute('aria-busy','true');
   try {
     renderConnection(await api(path,method,payload));
-    $('#connectionMessage').textContent=method==='DELETE'?'Yerel bağlantı kaldırıldı.':'QFEX bakiye, pozisyon ve komisyon erişimi doğrulandı.';
+    message.dataset.state='success';message.textContent=method==='DELETE'?'Yerel bağlantı kaldırıldı.':'Bağlantı kaydedildi. QFEX bakiye, pozisyon ve komisyon erişimi doğrulandı.';
     if(payload) $('#connectionForm').reset();loadMarkets();
-  }catch(e){$('#connectionMessage').textContent=e.message;}
-  finally{buttons.forEach(b=>b.disabled=false);await loadConnection();}
+  }catch(e){message.dataset.state='error';message.textContent=`Bağlantı tamamlanamadı: ${e.message} Girdiğiniz alanlar korundu; kontrol edip yeniden deneyin.`;}
+  finally{$('#connectionForm').setAttribute('aria-busy','false');buttons.forEach(b=>b.disabled=false);await loadConnection();}
 }
 $('#connectionForm').onsubmit=event=>{
   event.preventDefault();const credentials=Object.fromEntries(new FormData(event.currentTarget));
-  event.currentTarget.elements.secretKey.value='';event.currentTarget.elements.publicKey.value='';
   connectionAction('/api/connection','POST',credentials);
 };
 $('#retest').onclick=()=>connectionAction('/api/connection/test','POST');

@@ -17,6 +17,11 @@ test('account test requires both positions and fees; empty account is valid', as
   const client = { positions: async () => ({balance:{available_balance:0},positions:[]}), fees: async () => ({fees:{}}) };
   const result = await inspectAccount(client);
   assert.equal(result.balance.available_balance, 0);
+  client.positions = async () => ({balance:{available_balance:0},positions:null});
+  assert.deepEqual((await inspectAccount(client)).positions, []);
+  client.positions = async () => ({balance:{available_balance:0}});
+  await assert.rejects(inspectAccount(client), /biçimi/);
+  client.positions = async () => ({balance:{available_balance:0},positions:[]});
   client.fees = async () => { throw new Error('permission denied'); };
   await assert.rejects(inspectAccount(client), /permission/);
   client.fees = async () => ({});
