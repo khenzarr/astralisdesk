@@ -57,3 +57,14 @@ Yeni grafik, borsa listesi ve tasarım yerine ilk tamamlanacak iş gerçek emir 
 - Maker stratejisi performans ölçümü ve parametre optimizasyonu.
 
 Bu başlıklar bitmiş sayılmaz. Yeni geliştirme sonunda gerçekleşen değişikliği ve doğrulamasını buraya işle.
+
+## 2026-11-01 özel akış teşhisi
+
+Resmî positions/balance belgeleri okundu: position_response sembol bazlıdır,
+tam liste sonu işareti yoktur. Abonelik ACK'i boş hesap kanıtı değildir.
+İlk balance_response önbellek yoksa varsayılan sıfır olabilir.
+src/lib/private-probe.js ve scripts/probe-private.js eklendi: yalnız auth,
+subscribe ve get_user_orders gönderir; hiçbir emir veya hesap içeriği loglamaz.
+Test boş akışın flat sayılmadığını doğruladı. Kayıtlı yerel anahtarla canlı
+denemede 8 saniyede auth yanıtı alınamadı; bağlantının çalıştığı iddia edilemez.
+Bu teşhis üretim servisine bağlanmadı; yürütme kilidi devam ediyor.
