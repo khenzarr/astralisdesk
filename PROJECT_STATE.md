@@ -68,3 +68,11 @@ subscribe ve get_user_orders gönderir; hiçbir emir veya hesap içeriği loglam
 Test boş akışın flat sayılmadığını doğruladı. Kayıtlı yerel anahtarla canlı
 denemede 8 saniyede auth yanıtı alınamadı; bağlantının çalıştığı iddia edilemez.
 Bu teşhis üretim servisine bağlanmadı; yürütme kilidi devam ediyor.
+
+Devam teşhisi: canlı auth yanıtı {authenticated:true}; önceki kod yalnız
+{type:auth,result:success} kabul ettiği için sahte timeout üretiyordu. İki biçim
+desteklendi; canlı auth, üç abonelik, bakiye ve açık emir yanıtı doğrulandı.
+2026-10-29 ve 2026-10-30 REST positions aynı hesapta hâlâ HTTP500.
+inspectAccount REST500 sonrasında salt-okuma privateStream teşhisini döndürür.
+Tam pozisyon doğrulaması veya emir izni bu sonuçtan türetilmez. Bu değişiklik
+yerelde test edildi; VPS'ye henüz yayınlanmadı.

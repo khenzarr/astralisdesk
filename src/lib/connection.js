@@ -1,3 +1,5 @@
+import {probePrivateAccount} from './private-probe.js';
+
 export function validateCredentials(input) {
   const result = {};
   for (const name of ['publicKey', 'secretKey', 'accountId']) {
@@ -33,9 +35,11 @@ export async function inspectAccount(client) {
     balance=selected?{available_balance:selected.available_balance,equity:selected.equity}:null;
     balanceVerified=Boolean(selected);
   }
+  const privateStream=!positionsVerified&&typeof client.authHeaders==='function'
+    ? await probePrivateAccount(client):null;
   return {
     checkedAt:new Date().toISOString(),balance,positions,fees,
-    credentialsVerified:true,balanceVerified,positionsVerified,
+    credentialsVerified:true,balanceVerified,positionsVerified,privateStream,
     accountVerified:balanceVerified&&positionsVerified,
     warning:positionsVerified?null:`${positionsResult.reason.message} Bakiye erişimi doğrulandı; açık pozisyon listesi QFEX tarafından doğrulanamadı.`
   };

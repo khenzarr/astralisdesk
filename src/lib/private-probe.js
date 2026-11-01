@@ -1,13 +1,14 @@
 // Diagnostic only. A subscription ACK is never proof of a flat account.
 export function probePrivateAccount(client,{Socket=WebSocket,timeoutMs=8000}={}) {
   return new Promise(resolve=>{
-    const result={authenticated:false,subscriptions:[],positionMessages:0,balanceReceived:false,ordersReceived:false,positionsComplete:false,error:null};
+    const result={opened:false,frames:0,messageShapes:[],authenticated:false,subscriptions:[],positionMessages:0,balanceReceived:false,ordersReceived:false,positionsComplete:false,error:null};
     let socket,done=false;
     const finish=error=>{if(done)return;done=true;clearTimeout(timer);result.error=error;try{socket?.close();}catch{}resolve(result);};
-    const timer=setTimeout(()=>finish(result.authenticated?null:'Özel akış kimlik doğrulaması zaman aşımına uğradı.'),timeoutMs);
+    const timer=setTimeout(()=>finish(result.authenticated?null:result.opened?'Özel akış auth yanıtı zaman aşımına uğradı.':'Özel akış bağlantı açılışı zaman aşımına uğradı.'),timeoutMs);
     try {
       socket=new Socket('wss://trade.qfex.com?api_key='+encodeURIComponent(client.publicKey));
       socket.onopen=()=>{
+        result.opened=true;
         try {const h=client.authHeaders();socket.send(JSON.stringify({type:'auth',params:{hmac:{public_key:client.publicKey,nonce:h['x-qfex-nonce'],unix_ts:Number(h['x-qfex-timestamp']),signature:h['x-qfex-hmac-signature']},...(client.accountId?{account_id:client.accountId}:{})}}));}
         catch{finish('Özel akış imzalanamadı.');}
       };
@@ -15,8 +16,14 @@ export function probePrivateAccount(client,{Socket=WebSocket,timeoutMs=8000}={})
         if(done)return;
         try {
           const m=JSON.parse(e.data);
-          if(m.type==='auth'){
-            if(m.result!=='success')return finish('Özel akış kimlik doğrulaması reddedildi.');
+          result.frames++;
+          // Record only known protocol field presence, never arbitrary keys or values.
+          const shape=['type','result','error','err','authenticated','auth','subscribed','position_response','balance_response','all_orders_response'].filter(k=>Object.hasOwn(m,k)).join(',');
+          if(!result.messageShapes.includes(shape))result.messageShapes.push(shape);
+          if(m.err||m.type==='error'||m.type==='Err')return finish('QFEX özel akış isteğini reddetti.');
+          if(typeof m.authenticated==='boolean'||m.type==='auth'){
+            const accepted=typeof m.authenticated==='boolean'?m.authenticated:m.result==='success';
+            if(!accepted)return finish('Özel akış kimlik doğrulaması reddedildi.');
             if(result.authenticated)return;
             result.authenticated=true;
             socket.send(JSON.stringify({type:'subscribe',params:{channels:['positions','balances','order_responses']}}));

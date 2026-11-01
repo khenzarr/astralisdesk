@@ -8,7 +8,7 @@ test('private probe authenticates before subscribing and never treats empty stre
  class Socket {
   constructor(){queueMicrotask(()=>this.onopen());}
   send(raw){const m=JSON.parse(raw);sent.push(m);queueMicrotask(()=>{
-   if(m.type==='auth')this.onmessage({data:JSON.stringify({type:'auth',result:'success'})});
+   if(m.type==='auth')this.onmessage({data:JSON.stringify({authenticated:true})});
    if(m.type==='subscribe')for(const subscribed of m.params.channels)this.onmessage({data:JSON.stringify({subscribed})});
    if(m.type==='get_user_orders')this.onmessage({data:JSON.stringify({all_orders_response:{orders:[],twaps:[]}})});
   });}
